@@ -1,0 +1,429 @@
+Em Busca de um Algoritmo de Retransmiss ˜ao em Redes
+LoRaWAN
+Thiago Vinney Oliveira Almeida1, Jo˜ao Pedro Past ´orio1
+´Alvaro R. C. Souza1, Fabio A. Spanhol1, Edson T. de Camargo1
+1Universidade Tecnol ´ogica Federal do Paran ´a (UTFPR) - C ˆampus Toledo
+Rua Cristo Rei, 19 – Vila Becker – CEP 85902-490 – Toledo – PR – Brasil
+Resumo. A rede de comunicac ¸ ˜ao sem-ﬁo e longa dist ˆancia LoRaWAN vem
+sendo amplamente adotada para fornecer conectividade a objetos localizados
+tanto em centros urbanos quanto em localidades mais remotas. No entanto, o
+padr ˜ao LoRaWAN n ˜ao apresenta uma estrat ´egia para reenviar pacotes perdi-
+dos, apesar de apresentar marcac ¸ ˜oes para solicitar a conﬁrmac ¸ ˜ao de um pacote
+recebido. Este trabalho prop ˜oe um algoritmo chamado CR-LoRaWAN para
+gerenciar a retransmiss ˜ao de pacotes em redes LoRaWAN. Considerando um
+cen´ario de rastreamento de objetos em movimento, o algoritmo proposto foi
+avaliado em modelos de simulac ¸ ˜ao bem como na implementac ¸ ˜ao em um dis-
+positivo de rastreamento. Os resultados apresentam a eﬁci ˆencia do algoritmo
+proposto ao compar ´a-lo a uma estrat ´egia onde n ˜ao h´a conﬁrmac ¸ ˜ao.
+Abstract. The LoRaWAN wireless and long-distance communication network
+has been widely adopted to provide connectivity to objects located both in urban
+centers and in more remote locations. However, the LoRaWAN standard does
+not present an algorithm to retransmit lost packets, despite having ﬂags that al-
+low an object to request the server to conﬁrm the receipt of packets. This work
+proposes an algorithm named CR-LoRaWAN to manage packet retransmission
+in LoRaWAN networks. Considering a moving object tracking scenario, the pro-
+posed algorithm was evaluated in simulation models as well as implementation
+in a tracking device. The results show the efﬁciency of the proposed algorithm
+when comparing it to a strategy where there is no conﬁrmation.
+1. Introduc ¸ ˜ao
+O conceito de Internet das Coisas – ou IoT ( Internet of Things ) – deﬁne objetos co-
+nectados `a Internet capazes de gerar informac ¸ ˜ao e serem representados no mundo vir-
+tual [Bardyn et al. 2016]. A IoT compreende dom ´ınios de aplicac ¸ ˜ao diversos, como
+cidades inteligentes [Centenaro et al. 2016] e agricultura [Tzounis et al. 2017]. Nesses
+dom´ınios, aplicac ¸ ˜oes v ˆem sendo desenvolvidas, por exemplo, para monitorar a umidade
+do solo em cultura agr ´ıcola [Rajkumar et al. 2017], coletar par ˆametros de qualidade do
+ar em um centro urbano [Johnston et al. 2019] ou rastrear objetos em movimento em
+tempo real pela Internet [da Silva et al. 2020]. Tais aplicac ¸ ˜oes compartilham entre si a
+depend ˆencia de uma rede de comunicac ¸ ˜ao para enviar e receber dados.
+Uma caracter ´ıstica das redes de comunicac ¸ ˜ao IoT ´e sua topologia din ˆamica e ins-
+tabilidade devido ao enfraquecimento de bateria, mobilidade, ru ´ıdo, ou mesmo falha tem-
+por´aria no m ´odulo de comunicac ¸ ˜ao [Past ´orio et al. 2020]. O desaﬁo ´e ainda maior devidoaos enlaces sem-ﬁo de curto e/ou longo alcance empregados na comunicac ¸ ˜ao. Algumas
+aplicac ¸ ˜oes aceitam a perda de alguns pacotes durante um intervalo de tempo, de modo
+que n ˜ao´e necess ´ario implementar qualquer garantia de entrega. Por outro lado, certas
+aplicac ¸ ˜oes n ˜ao toleram perdas. Por exemplo, um dispositivo ﬁnal IoT que tem como
+objetivo detectar a concentrac ¸ ˜ao de gases t ´oxicos em um ambiente requer que os dados
+enviados sejam de fato recebidos pelo servidor. Da mesma forma, ao rastrear um objeto
+em movimento, deseja-se conhecer todo o seu percurso ainda que em determinados tre-
+chos as coordenadas geogr ´aﬁcas n ˜ao sejam recebidas devido a obst ´aculos. Nesse sentido,
+apesar de instabilidades tempor ´arias na comunicac ¸ ˜ao, uma estrat ´egia para assegurar que
+os dados foram de fato recebidos ´e essencial para o sucesso da aplicac ¸ ˜ao.
+Noˆambito das redes de longo alcance e baixa pot ˆencia, ou Low Power Wide Area
+Network (LPWAN) [Centenaro et al. 2016, Guibene et al. 2017], destaca-se o padr ˜ao
+aberto LoRaWAN. Constru ´ıdo com base na tecnologia sem ﬁo Long Range (LoRa), o
+padr˜ao caracteriza-se por cobrir extensas ´areas (at ´e 50 quil ˆometros), oferecer uma taxa de
+transfer ˆencia baixa e n ˜ao demandar pagamento de taxas de uso. O protocolo do padr ˜ao
+LoRaWAN oferece um mecanismo de conﬁrmac ¸ ˜ao por meio de algumas ﬂags presentes
+no pacote. No entanto, tal protocolo n ˜ao conta com um gerenciador que trate os pacotes
+n˜ao conﬁrmados e agende os reenvios necess ´arios, como acontece no Transmission Con-
+trol Protocol (TCP) [Jacobson 1988]. Destaca-se que um pacote n ˜ao conﬁrmado pode ter
+sido realmente perdido, impactando tamb ´em em como o dispositivo armazena temporari-
+amente os pacotes at ´e que haja sua conﬁrmac ¸ ˜ao.
+O objetivo deste trabalho ´e propor um algoritmo eﬁciente para retransmitir pacotes
+em redes LoRaWAN. O algoritmo CR-LoRaWAN proposto ´e avaliado atrav ´es de um
+estudo de caso usando o simulador de c ´odigo aberto ns-3 [nsnam 2021]. O estudo de
+caso vem de uma parceria entre a Universidade e o Munic ´ıpio que busca desenvolver uma
+soluc ¸ ˜ao de rastreamento em tempo real de caminh ˜oes da coleta seletiva de lixo usando
+uma rede LoRaWAN que est ´a sendo implantada na ´area urbana do munic ´ıpio. O objetivo
+da simulac ¸ ˜ao´e veriﬁcar a eﬁci ˆencia do algoritmo de conﬁrmac ¸ ˜ao em diferentes cen ´arios
+de operac ¸ ˜ao, ou seja, se o algoritmo proposto ´e capaz de reduzir a quantidade de pacotes
+perdidos. A soluc ¸ ˜ao tamb ´em´e programada e avaliada em um dispositivo chamado TTGO
+T-Beam. O T-Beam ´e um m ´odulo microcontrolado constru ´ıdo em torno da estrutura do
+chip ESP32, incluindo um m ´odulo GPS e transmissor LoRa.
+Conforme observado em trabalhos anteriores [da Silva et al. 2020,
+Rossato et al. 2020, Ferreira et al. 2020], dispositivos empregados para rastrear ob-
+jetos m ´oveis geralmente perdem pacotes quando, por exemplo, o objeto passa por
+locais onde h ´a obst ´aculos para propagac ¸ ˜ao das ondas eletromagn ´eticas. Os resultados
+de simulac ¸ ˜ao obtidos demonstram que o algoritmo CR-LoRaWAN ´e capaz de atenuar
+a perda de pacotes, aumentando em 15% a taxa de pacotes recebidos em um cen ´ario
+com 3–5 gateways e alta obstruc ¸ ˜ao. J ´a resultados obtidos do T-Beam mostraram que o
+algoritmo ´e capaz de retransmitir a maioria dos pacotes perdidos.
+Este artigo est ´a organizado da seguinte forma. A Sec ¸ ˜ao 2 revisa brevemente os
+padr˜oes LoRa e LoRaWAN. A Sec ¸ ˜ao 3 descreve o algoritmo de retransmiss ˜ao proposto e a
+metodologia de avaliac ¸ ˜ao. A Sec ¸ ˜ao 4 sumariza e discute os resultados obtidos. Finalmente
+a Sec ¸ ˜ao 5 apresenta a conclus ˜ao e poss ´ıveis trabalhos futuros.2. LoRa e LoRaWAN
+LoRa ´e uma tecnologia propriet ´aria da Semtech. Seu objetivo ´e realizar comunicac ¸ ˜ao
+de radiofrequ ˆencia utilizando modulac ¸ ˜ao derivada do espalhamento espectral por Chirp
+[Semtech Corporation 2015]. A tecnologia ´e basicamente uma implementac ¸ ˜ao de camada
+f´ısica. Apesar disso, existem alguns pontos de camada de enlace deﬁnidos em LoRa,
+como formato de quadro e t ´ecnicas de c ´odigo de erro. Por outro lado, LoRa n ˜ao imple-
+menta o controle de acesso ao meio, tarefa fundamental de camada de enlace.
+LoRaWAN ´e um protocolo de rede aberto, mantido pela LoRa Alliance, que tem
+como objetivo gerenciar uma LPWAN. LoRaWAN oferece seguranc ¸a, comunicac ¸ ˜ao bi-
+direcional, mobilidade e localizac ¸ ˜ao dos servic ¸os. Sua estrutura apresenta tr ˆes tipos de
+dispositivos: dispositivos ﬁnais ( end-devices ),gateways e servidores de rede ( network
+servers ). Esses dispositivos s ˜ao distribu ´ıdos em uma rede com topologia estrela de es-
+trelas, em que os gateways conectam os dispositivos ﬁnais, no que seria uma topologia
+estrela, enquanto os gateways se conectam em topologia estrela aos servidores de rede,
+formando a estrela de estrelas. A rede opera com protocolo de m ´ultiplo acesso baseado no
+protocolo ALOHA, em que um dispositivo, ao ter dados para transmitir, prepara o pacote e
+o envia, sem qualquer tipo de sondagem ao meio de transmiss ˜ao [Beltramelli et al. 2020].
+Os dispositivos ﬁnais se enquadram em tr ˆes classes diferentes, sendo denomina-
+das classe A, B e C. As classes se diferenciam no modo de envio e recepc ¸ ˜ao, e apenas
+a classe A tem implementac ¸ ˜ao obrigat ´oria nos dispositivos. Essa classe ´e caracterizada
+por abrir duas janelas de recepc ¸ ˜ao (downlink ) logo ap ´os o uso de uma janela de trans-
+miss ˜ao (uplink ), de modo que s ´o pode receber dados ap ´os o envio de alguma informac ¸ ˜ao.
+´E considerada a classe mais econ ˆomica em termos energ ´eticos, pois mant ´em o disposi-
+tivo ﬁnal em repouso fora dos per ´ıodos de transmiss ˜ao e recepc ¸ ˜ao, i.e., no tempo ocioso
+[LoRa Alliance 2017]. Assim, ´e recomendada para dispositivos que precisam de pouca
+informac ¸ ˜ao vinda da aplicac ¸ ˜ao, e apenas ap ´os os processos de envio, o que pode ser visto
+como ´util para dispositivos como sensores.
+Redes LoRaWAN suportam a conﬁrmac ¸ ˜ao de mensagens, apesar de n ˜ao
+possu ´ırem um protocolo de controle de conﬁrmac ¸ ˜ao de mensagens, como Stop and Wait ,
+Retransmiss ˜ao Seletiva ou Go-Back-N . Para enviar mensagens que exigem o recebimento
+de conﬁrmac ¸ ˜ao, basta alterar o valor do campo MType do pacote. Esse campo, de 3
+bits, ´e apresentado na Figura 1. Para enviar uma mensagem de uplink com conﬁrmac ¸ ˜ao,
+basta deﬁnir o MType com os bits 100 (ao inv ´es de 010), enquanto que mensagens de
+downlink com conﬁrmac ¸ ˜ao usam o MType com os bits 101 (ao inv ´es de 011).
+3. Materiais e M ´etodos
+Esta sec ¸ ˜ao apresenta o algoritmo de controle de retransmiss ˜ao CR-LoRaWAN proposto
+e os meios de obtenc ¸ ˜ao de resultados. O sistema LoRaWAN permite, nativamente, o
+envio de mensagens com conﬁrmac ¸ ˜ao, por ´em n ˜ao implementa uma soluc ¸ ˜ao de controle
+do processo de retransmiss ˜ao. Para essa ﬁnalidade, o algoritmo CR-LoRaWAN (descrito
+na Sec ¸ ˜ao 3.1) ser ´a empregado. Para obtenc ¸ ˜ao de resultados, utiliza-se um dispositivo
+programado e tamb ´em simulac ¸ ˜oes via ns-3. A utilizac ¸ ˜ao de simulac ¸ ˜ao´e´util para veriﬁcar
+o impacto de diferentes vari ´aveis, como as condic ¸ ˜oes de propagac ¸ ˜ao, n ´umero de gateways
+e quantidade de dispositivos ﬁnais operando. A investigac ¸ ˜ao desses par ˆametros seria mais
+dif´ıcil de se controlar (no caso das condic ¸ ˜oes de propagac ¸ ˜ao) e mais custosas (nos casos doFigura 1. Localizac ¸ ˜ao do campo MType na estrutura de uma mensagem LoRa.
+Fonte: Adaptado de [LoRa Alliance 2017].
+n´umero de gateways e dispositivos ativos). Considerac ¸ ˜oes sobre o dispositivo programado
+e o ambiente de simulac ¸ ˜ao s˜ao feitas nas subsec ¸ ˜oes 3.2 e 3.3, respectivamente.
+Os par ˆametros LoRa s ˜ao os mesmos tanto para o dispositivo programado quanto
+para a simulac ¸ ˜ao em ns-3. Utilizou-se o modelo AU915 de planejamento de canal, com
+canais de uplink de 125 kHz, modelo que ´e descrito para uso no Brasil pela ANATEL. O
+fator de espalhamento ´e conﬁgurado inicialmente para SF= 9e a taxa de codiﬁcac ¸ ˜ao´e
+dada por CR=4
+5.
+3.1. Algoritmo de Controle de Retransmiss ˜ao LoRaWAN
+O algoritmo CR-LoRaWAN ´e proposto para operac ¸ ˜ao em dispositivos classe A, e tem
+como objetivo a entrega de pacotes transmitidos por esses dispositivos. N ˜ao se pode
+concluir, de antem ˜ao, que o algoritmo proposto ´e capaz de entregar todos os pacotes, mas
+espera-se que o mesmo seja capaz de garantir a entrega nos casos em que a comunicac ¸ ˜ao
+n˜ao sofra com uma falha muito longa, dado que o dispositivo possui buffer limitado, pode
+operar tamb ´em por tempo limitado e n ˜ao est ´a previsto que o mesmo mantenha os pacotes
+salvos para tentar retransmitir na pr ´oxima janela de utilizac ¸ ˜ao.
+A implementac ¸ ˜ao do algoritmo foi separada em dois planos: no plano de controle
+e gerenciamento, utilizou-se a linguagem C, combinada com a biblioteca LMIC para o
+gerenciamento de acesso `a rede LoRaWAN. No plano de armazenamento ( buffer de ar-
+mazenamento de pacotes), utilizou-se a linguagem de programac ¸ ˜ao C++. A biblioteca
+LMIC possui papel fundamental no processo de controle, principalmente ao prover even-
+tos de interesse. Dentre os eventos, destacam-se os eventos de conﬁrmac ¸ ˜ao de mensagem,
+EVTXCOMPLETE , e de ingresso na rede LoRaWAN, EVJOINED .
+O ﬂuxograma do algoritmo CR-LoRaWAN ´e apresentado na Figura 2, sendo divi-
+dido em duas funcionalidades principais, mostradas na ﬁgura como #1 e #2. A func ¸ ˜ao #1
+´e respons ´avel por retransmitir pacotes que n ˜ao foram conﬁrmados anteriormente, sendo
+ativada quando uma mensagem de conﬁrmac ¸ ˜ao de algum pacote ´e recebida. Adota-se esse
+comportamento pois o recebimento de uma conﬁrmac ¸ ˜ao indica que o dispositivo, naquele
+momento, est ´a em uma ´area coberta por algum gateway , sendo um momento oportuno
+para transmitir algum pacote que tenha falhado anteriormente. Deste modo, ao receber
+uma conﬁrmac ¸ ˜ao, o dispositivo veriﬁca se h ´a pacotes que n ˜ao receberam conﬁrmac ¸ ˜ao,
+e em caso positivo, comec ¸a a retransmiti-los. Se n ˜ao houver pacotes nessa situac ¸ ˜ao, ou
+todos j ´a tiverem sido retransmitidos, retorna-se `a func ¸ ˜ao #2.Figura 2. Fluxograma do algoritmo CR-LoRaWAN proposto.
+A func ¸ ˜ao #2 ´e respons ´avel pelo controle do processo de transmiss ˜ao e
+conﬁrmac ¸ ˜ao, e para facilitar a explicac ¸ ˜ao´e subdividida em tr ˆes etapas (de I a III), indica-
+das por ret ˆangulos tracejados na Figura 2. A Etapa I ´e respons ´avel pela primeira tentativa
+de envio de um grupo de mensagens. S ˜ao enviadas quatro mensagens sem conﬁrmac ¸ ˜ao, e
+a quinta mensagem fecha o grupo, sendo enviada com pedido de conﬁrmac ¸ ˜ao. Para enviar
+mensagens sem conﬁrmac ¸ ˜ao, conﬁgura-se o campo MType com o valor 010, que indicamensagens de uplink com conﬁrmac ¸ ˜ao desativada. Para as mensagens com conﬁrmac ¸ ˜ao,
+conﬁgura-se o MType com o valor 100, indicando mensagens de uplink com conﬁrmac ¸ ˜ao
+de recebimento. Caso a conﬁrmac ¸ ˜ao seja recebida nas janelas abertas pela operac ¸ ˜ao em
+classe A, a func ¸ ˜ao #1 ´e executada, e posteriormente retorna-se `a func ¸ ˜ao #1. No caso em
+que a conﬁrmac ¸ ˜ao n˜ao acontece, executa-se a Etapa II.
+A Etapa II foi pensada para a possibilidade de que a interrupc ¸ ˜ao de servic ¸o seja
+curta, de modo que uma nova tentativa de envio do grupo deve ser suﬁciente para que os
+pacotes sejam conﬁrmados. O processo de envio ´e similar ao da Etapa I, e no caso de se
+obter sucesso, o atraso desse grupo de pacotes ´e reduzido em comparac ¸ ˜ao a coloc ´a-los
+no ﬁm da ﬁla de transmiss ˜ao. No caso de recebimento de conﬁrmac ¸ ˜ao, a func ¸ ˜ao #2 ´e
+executada; caso contr ´ario, executa-se a Etapa III.
+Finalmente, a Etapa III pode ser vista como a percepc ¸ ˜ao de que o problema de
+conex ˜ao se mostra mais longo que o esperado, e n ˜ao se sabe quando a comunicac ¸ ˜ao ser ´a
+retomada. Assim, todos os pacotes enviados a partir desse ponto est ˜ao com pedido de
+conﬁrmac ¸ ˜ao ativado (MType em 100). Assim que um deles ´e conﬁrmado, alterna-se para
+a func ¸ ˜ao #1 e, posteriormente, para a execuc ¸ ˜ao da func ¸ ˜ao #2.
+A ideia de se agrupar as mensagens em blocos de 5 se d ´a por uma soluc ¸ ˜ao de com-
+promisso. A conﬁrmac ¸ ˜ao de cada uma das mensagens demandaria uma grande quantidade
+de mensagens enviadas pelo gateway e aumento de processamento e gasto energ ´etico por
+conta dos dispositivos ﬁnais. Grupos muito grande de mensagens demandam o armazena-
+mento de muitas mensagens e tamb ´em podem gerar a retransmiss ˜ao de muitas mensagens,
+dado que a falta da conﬁrmac ¸ ˜ao do grupo implica na retransmiss ˜ao de todas as mensagens.
+3.2. Dispositivo F ´ısico
+O dispositivo f ´ısico selecionado para o experimento foi o TTGO T-Beam, j ´a avali-
+ado no contexto do problema de rastreamento de ve ´ıculos em um trabalho anterior
+[da Silva et al. 2020] tendo apresentado os melhores resultados em termos de cobertura.
+O T-Beam ´e composto por uma placa montada em torno de um chip ESP32 dual core em
+conjunto a um m ´odulo LoRa, Semtech SX1276, e um m ´odulo GPS, Ublox NEO-6M. A
+programac ¸ ˜ao do dispositivo utilizou a biblioteca LMIC, modiﬁcada pela MCCI Corpora-
+tion. A LMIC implementa uma abstrac ¸ ˜ao de hardware e´e respons ´avel pelos processos
+de gerenciamento de transmiss ˜ao e comunicac ¸ ˜ao no dispositivo ﬁnal. Para programar o
+m´odulo GPS utilizou-se a biblioteca TinyGPS++.
+Esse dispositivo ser ´a utilizado em um experimento de viabilidade da soluc ¸ ˜ao pro-
+posta, em testes controlados. Em um segundo momento, se faz necess ´ario investigar o
+impacto de outros par ˆametros de sistema, como por exemplo os cen ´arios de propagac ¸ ˜ao
+e o impacto da quantidade e localizac ¸ ˜ao dos gateways . Para prover maior ﬂexibilidade
+nessas an ´alises, ser ´a empregada tamb ´em a simulac ¸ ˜ao computacional, descrita a seguir.
+3.3. Simulac ¸ ˜ao
+Foram realizadas simulac ¸ ˜oes considerando dispositivos executando o algoritmo CR-
+LoRaWAN em diversos cen ´arios de operac ¸ ˜ao para avaliar o impacto do algoritmo na
+reduc ¸ ˜ao de pacotes perdidos. Para modelar os cen ´arios de simulac ¸ ˜ao foi utilizado o si-
+mulador de c ´odigo aberto ns-3 [nsnam 2021], vers ˜ao 3.31. O ns-3 fornece mecanismospara simulac ¸ ˜ao de redes em ambiente controlado utilizando um sistema de m ´odulos in-
+dependentes, que podem ser combinados para representar uma rede complexa. Um dos
+m´odulos utilizados foi o LoRaWAN [Magrin 2016], que fornece uma s ´erie de estruturas
+para reproduzir cada componente de uma rede LoRa.
+Para a simulac ¸ ˜ao do canal de transmiss ˜ao foi utilizado o modelo de propagac ¸ ˜ao de
+perda de percurso por dist ˆancia logar ´ıtmica [Rappaport 2009]. A perda de percurso nesse
+modelo, em decib ´eis (dB), ´e mostrada na Equac ¸ ˜ao 1:
+L=L0+ 10nlog10d
+d0
+; (1)
+onde as dist ˆancias est ˜ao em metros, sendo da dist ˆancia entre transmissor e receptor;
+d0uma dist ˆancia de refer ˆencia tomada pr ´oxima ao receptor; L0a perda de percurso na
+distˆancia de refer ˆencia d0eno expoente de perda de percurso, podendo assumir valores
+distintos dependendo do ambiente a ser simulado [Rappaport 2009] com n= 2 para
+modelo de campo aberto e 4n6para cen ´arios densamente ediﬁcados.
+Para simular os demais efeitos que impactam na atenuac ¸ ˜ao de sinal, o m ´odulo
+LoRaWAN implementa o modelo TR 45.820 para perdas ocasionadas por construc ¸ ˜oes ou
+obstruc ¸ ˜oes e uma correlac ¸ ˜ao para sombreamento [Magrin 2016]. Para analisar os v ´arios
+cen´arios de operac ¸ ˜ao de uma rede LoRaWAN foram realizadas simulac ¸ ˜oes com diferentes
+conﬁgurac ¸ ˜oes, variando a quantidade e posicionamento de dispositivos ﬁnais e gateways
+presentes na rede. Tamb ´em foram considerados diferentes ambientes de propagac ¸ ˜ao do
+sinal, baseados no n ´ıvel de obstruc ¸ ˜ao do local em que os dispositivos est ˜ao inseridos,
+utilizando o m ´odulo buildings do ns-3 para criar os tr ˆes cen ´arios seguintes:
+0– espac ¸o sem obst ´aculos, simulando ambiente sem construc ¸ ˜oes ou sombrea-
+mento, com n= 3;5;
+1– ambiente pouco urbanizado, contando poucas obstruc ¸ ˜oes prediais introduzidos
+com o m ´odulo buildings , com n= 3;75;
+2– ambiente densamente constru ´ıdo, com grande quantidade de obstruc ¸ ˜oes intro-
+duzidas pelo m ´odulo buildings , comum a cen ´arios urbanos, com n= 4.
+4. Resultados e Discuss ˜ao
+Esta sec ¸ ˜ao apresenta o resultados obtidos por meio do dispositivo f ´ısico e simulac ¸ ˜ao. A
+simulac ¸ ˜ao primeiramente relata resultados variando o n ´umero de gateways e na sequ ˆencia
+descreve a comparac ¸ ˜ao do algoritmo com o um cen ´ario onde n ˜ao h´a retransmiss ˜ao.
+4.1. Dispositivo F ´ısico
+Os testes com o dispositivo T-Beam em ambiente controlado foram executados no campus
+Toledo da UTFPR com o dispositivo localizado a poucos metros do gateway , de modo
+que a conex ˜ao fosse a mais est ´avel poss ´ıvel. Para se conseguir a perda de sinal em tal
+cen´ario foi utilizada uma caixa completamente revestida de papel alum ´ınio, baseando-se
+no princ ´ıpio de uma gaiola de Faraday. Optou-se por esse modelo de testes para controlar
+o momento e a durac ¸ ˜ao do evento de interrupc ¸ ˜ao do sinal. Ap ´os o T-Beam conectar-se
+na rede, o dispositivo realiza envios de alguns pacotes sem interfer ˆencia at ´e o sinal estar
+estabilizado. Em seguida o dispositivo ´e mantido em uma gaiola de Faraday por algunsminutos para que ocorra o bloqueio do sinal. Ao t ´ermino desse per ´ıodo de interrupc ¸ ˜ao o
+dispositivo ´e retirado da gaiola e mantido ligado at ´e o algoritmo CR-LoRaWAN percorrer
+o atraso gerado durante o tempo sem sinal, ou seja, at ´e que consiga retransmitir os pacotes
+sem conﬁrmac ¸ ˜ao e aqueles gerados posteriormente.
+Foram realizados dois testes segundo essa abordagem: no Teste #1o dispositivo
+´e mantido na gaiola por cerca de 1 minuto, enquanto que no Teste #2o tempo ´e incre-
+mentado para cerca de 2 minutos. Os resultados s ˜ao apresentados na Tabela 1. A coluna
+“Quantidade de Pacotes impactados” corresponde `a quantidade de pacotes que foram im-
+pactados pela interrupc ¸ ˜ao de sinal, seja por aguardarem para retransmiss ˜ao ou aguardarem
+que outros sejam retransmitidos para, ent ˜ao, serem transmitidos. J ´a a coluna “Quantidade
+de Pacotes conﬁrmados” corresponde ao total de pacotes conﬁrmados at ´e o momento em
+que o teste ´e ﬁnalizado, o que ´e feito com o desligamento manual do dispositivo.
+Intervalo (minutos) Quantidade de Pacotes
+perda sinal teste gerados conﬁrmados impactados
+Teste #101:05 05:21 34 30 20
+01:21 05:25 35 30 17
+01:32 05:36 38 35 18
+Teste #202:09 06:32 41 40 26
+02:23 06:22 42 40 26
+02:12 08:03 50 45 29
+Tabela 1. Resultados dos testes com o dispositivo T-Beam.
+Os resultados indicam uma taxa de tr ´afego conﬁrmado, i.e., a raz ˜ao entre a quanti-
+dade de pacotes conﬁrmados e a quantidade pacotes gerados, de 89% no Teste #1e 94%
+no Teste #2. Os testes n ˜ao atingiram a totalidade de conﬁrmac ¸ ˜oes por conta da natureza
+de conﬁrmac ¸ ˜ao do algoritmo proposto: como o algoritmo conﬁrma a cada 5 transmiss ˜oes,
+a n˜ao ser que o total de pacotes seja m ´ultiplo de 5 haver ´a pacotes n ˜ao conﬁrmados. Para
+resolver essa quest ˜ao, pode ser necess ´ario o envio de um pacote especial para indicar o
+ﬁm de transmiss ˜ao. No ´ultimo caso do Teste #2, uma hip ´otese para os ´ultimos 5 pacotes
+n˜ao terem sido conﬁrmados, ´e que o quinquag ´esimo pacote foi enviado logo ap ´os o dis-
+positivo ter sido desligado. Como h ´a um atraso para enviar um pacote de conﬁrmac ¸ ˜ao,´e
+poss´ıvel o dispositivo n ˜ao estava ativo quando a conﬁrmac ¸ ˜ao foi enviada.
+4.2. Simulac ¸ ˜oes
+4.2.1. Modelo base
+Antes da avaliar o algoritmo CR-LoRaWAN foi realizada uma simulac ¸ ˜ao base com o
+intuito de veriﬁcar o impacto da quantidade de gateways nos 3 diferentes cen ´arios de
+obstruc ¸ ˜ao de sinal descritos na Sec ¸ ˜ao 3.3. Neste primeiro cen ´ario, exibido na Figura 3,
+simulou-se o deslocamento do dispositivo ﬁnal e registrou-se o percentual de pacotes re-
+cebidos nos gateways . O posicionamento dos gateways obedece ao projeto em andamento
+para implantac ¸ ˜ao da rede LoRaWAN na cidade de Toledo [Rossato et al. 2020] e atual-
+mente apenas o Gateway 1 da Figura 3 encontra-se instalado e operando. Os gateways
+s˜ao adicionados conforme a ordem de numerac ¸ ˜ao, e cada ponto apresentado na Figura 4
+foi simulado 100 vezes.Figura 3. Representac ¸ ˜ao do primeiro cen ´ario simulado.
+No cen ´ario0(baixa obstruc ¸ ˜ao do sinal), assim como esperado, o percentual de
+pacotes recebidos diminui conforme o dispositivo ﬁnal afasta-se do gateway 1 chegando
+a apenas 20-30%. Tamb ´em como esperado, a adic ¸ ˜ao de mais gateways (2-5) melhora
+essa situac ¸ ˜ao. O comportamento da taxa de pacotes entregues em func ¸ ˜ao da dist ˆancia do
+dispositivo ﬁnal e da quantidade de gateways pode ser observado na Figura 4.
+Figura 4. Resultado obtido com a primeira simulac ¸ ˜ao no cen ´ario 0.
+Com a introduc ¸ ˜ao de obstruc ¸ ˜oes no meio de propagac ¸ ˜ao nos cen ´arios 1e2, si-
+mulando ambientes urbanos, nota-se uma acentuac ¸ ˜ao na perda de pacotes. Mesmo a
+adic ¸˜ao dos gateways 2–5 n ˜ao garante um percentual satisfat ´orio de entrega de pacotes.
+No cen ´ario 2 (muitas obstruc ¸ ˜oes e sombreamento, t ´ıpico dos centros urbanos) para o ﬁ-
+nal do percurso nos gateways 3-5 a taxa ﬁca limitada a 50-60%. Esse comportamento ´e
+mostrado na Figura 5.
+Atrav ´es dessas simulac ¸ ˜oes percebemos que apesar da adic ¸ ˜aogateways incremen-
+tar o percentual de pacotes recebidos, em cen ´arios com muitas obstruc ¸ ˜oes, a perda de
+pacotes persiste. Logo, a utilizac ¸ ˜ao de um algoritmo de retransmiss ˜ao torna-se essencial
+para tentar reduzir essa perda.Figura 5. Resultado obtido com a primeira simulac ¸ ˜ao no cen ´ario 2.
+4.2.2. Modelo sem Retransmiss ˜ao x Modelo usando o algoritmo CR-LoRaWAN
+Partindo do modelo base foi introduzido o algoritmo CR-LoRaWAN j ´a testado no dispo-
+sitivo f ´ısico, com resultados apresentados na Sec ¸ ˜ao 4.1. Nas simulac ¸ ˜oes foi avaliado o
+impacto do algoritmo em dois aspectos: (a) tempo de entrega dos pacotes e (b) taxa de
+entrega dos pacotes.
+Para o primeiro aspecto foi coletado o tempo de chegada do pacote no gateway
+e o tempo decorrido da gerac ¸ ˜ao do pacote no dispositivo ﬁnal o seu recebimento em
+umgateway . Foram considerados tr ˆesgateways em operac ¸ ˜ao e o dispositivo ﬁnal se
+deslocando conforme ilustra a Figura 6. Foi analisado o comportamento do algoritmo
+CR-LoRaWAN perante os tr ˆes diferentes cen ´arios de obstruc ¸ ˜ao. Os resultados podem ser
+visto nas Figuras 7, 8 e 9, respectivamente.
+Figura 6. Modelo para avaliar o tempo de entrega de pacotes com CR-LoRaWAN.
+Considerando inicialmente a Figura 7, apenas um pacote de dados n ˜ao chegou a
+ser recebido na primeira transmiss ˜ao, enquanto todos os outros foram recebidos sem a
+necessidade de retransmiss ˜ao. Isso pode ser explicado pelo fato do cen ´ario0simular um
+meio de propagac ¸ ˜ao em ambiente aberto, sem obstruc ¸ ˜oes ou sombreamento. Apesar de
+ideal ´e um modelo bastante distante do que ocorre em operac ¸ ˜oes reais.Figura 7. Algoritmo CR-LoRaWAN no cen ´ario 0.
+Figura 8. Algoritmo CR-LoRaWAN no cen ´ario 1.
+Figura 9. Algoritmo CR-LoRaWAN no cen ´ario 2.
+Na sequ ˆencia, o n ´ıvel de obstruc ¸ ˜oes e sombreamento ´e aumentado, tornando o
+modelo simulado mais veross ´ımil com ´areas urbanas reais. Isso gera um aumento no
+n´umero de pacotes n ˜ao recebidos e consequentemente de retransmiss ˜oes realizadas, como
+constata-se nas Figuras 8 e 9. Para o cen ´ario1, dos 100 pacotes enviados 6 n ˜ao foram
+recebidos e 15 pacotes foram recebidos a partir de retransmiss ˜oes. Esse valor sofre umaumento no cen ´ario2, saltando para 13 e 32, respectivamente. Assim, conclui-se que
+com o aumento no n ´ıvel de obstruc ¸ ˜oes presentes no ambiente h ´a uma reduc ¸ ˜ao no n ´umero
+de pacotes recebidos, fazendo com que um algoritmo de retransmiss ˜ao seja relevante.
+Na taxa de recebimento de pacotes comparou-se o desempenho de um dispositivo
+ﬁnal m ´ovel com e sem a utilizac ¸ ˜ao do algoritmo CR-LoRaWAN. Para tanto considerou-se
+diferentes n ´umeros de gateways ativos, variando de 1 a 5, adicionados de acordo com a
+ordem indicada na Figura 10. O dispositivo realiza um mesmo percurso repetidas vezes,
+gerando 1000 pacotes. Tal percurso consiste em uma trajet ´oria de 3 km para norte, 3 km
+para leste, 3 km para sul e 3 km para oeste, visando alterar a dist ˆancia entre o dispositivo
+ﬁnal e os 5 gateways presentes na rede. A an ´alise expandiu-se para os 3 diferentes n ´ıveis
+de obstruc ¸ ˜ao, que foram colocados em paralelo na Figura 11. Ao analisar a Figura 11
+se percebe que, independente do cen ´ario de obstruc ¸ ˜ao e da quantidade de gateways , o
+algoritmo CR-LoRaWAN aumenta o percentual de pacotes recebidos.
+Figura 10. Modelo para avaliar a taxa de pacotes recebidos.
+Figura 11. Comparativo entre uso ou n ˜ao do algoritmo CR-LoRaWAN em diversos
+cen´arios de obstruc ¸ ˜ao.
+Para o cen ´ario0, considerando apenas um gateway , o aumento do percentual de
+pacotes recebidos foi de 12,6%, variando de 70,7% sem o algoritmo para 83,3% com
+o algoritmo CR-LoRaWAN. Nesse mesmo cen ´ario, para dois gateways o aumento foide 7,8%, indo de 88,4% para 96,2%. J ´a para 3–5 gateways esse aumento permaneceu
+pr´oximo de 4% passando de 95% para 99%. No cen ´ario1, com um gateway foi ob-
+servado um acr ´escimo de 9% no percentual de pacotes recebidos, indo de 50,6% para
+59,6%, com dois gateways esse incremento foi de 13,2%, indo de 70% para 83,2%, en-
+quanto que para 3–5 gateways houve um aumento de aproximadamente 10%, variando de
+aproximadamente 85% para 95%. Contudo, no cen ´ario2de alta obstruc ¸ ˜ao, com apenas
+umgateway , o ganho no percentual de pacotes recebidos foi menor do que nos demais
+cen´arios: aproximadamente 0,6%. Para dois gateways houve um aumento de 10,3%, de
+50,8% para 61,1%. Finalmente, para 3–5 gateways houve um aumento mais signiﬁcativo,
+de aproximadamente 15%, variando de 70% para 85%.
+5. Considerac ¸ ˜oes Finais
+Este trabalho apresentou o algoritmo CR-LoRaWAN para gerenciar a retransmiss ˜ao de
+pacotes em redes LoRaWAN. O algoritmo proposto foi avaliado atrav ´es do simulador de
+c´odigo aberto ns-3 e de um dispositivo program ´avel micro-controlado chamado T-Beam
+que conta com sensor GPS e transmissor LoRa embutidos. Nos resultados com o T-
+Beam, o CR-LoRaWAN foi capaz de conﬁrmar 89% e 94% do tr ´afego gerado para os
+experimentos Teste #1e Teste #2, respectivamente. J ´a os resultados de simulac ¸ ˜ao mos-
+tram que mesmo ao adicionar mais gateways em cen ´arios de maior obstruc ¸ ˜ao, ainda h ´a
+perda consider ´avel de pacotes. Nesse aspecto, percebeu-se que conforme aumenta o n ´ıvel
+de obstruc ¸ ˜oes no ambiente h ´a uma reduc ¸ ˜ao no n ´umero de pacotes recebidos, mostrando a
+import ˆancia do algoritmo CR-LoRaWAN. Em cen ´arios para 3–5 gateways com alta taxa
+de obstruc ¸ ˜ao houve um aumento de aproximadamente 15% na taxa de pacotes recebidos
+ao utilizar o algoritmo.
+Em relac ¸ ˜ao a trabalhos futuros, podem ser destacadas tanto an ´alises mais detalha-
+das no CR-LoRaWAN quanto otimizac ¸ ˜oes operacionais no pr ´oprio algoritmo, incluindo
+comparac ¸ ˜ao com outras estrat ´egias cl ´assicas. Em relac ¸ ˜ao`as avaliac ¸ ˜oes,´e poss ´ıvel analisar
+o algoritmo quando existem mais dispositivos utilizando a rede LoRaWAN, o que pode
+impactar tanto na taxa de perda de pacote quanto na viabilidade da soluc ¸ ˜ao, a depender da
+ocupac ¸ ˜ao da rede com retransmiss ˜oes. As retransmiss ˜oes impactam tamb ´em no ciclo de
+trabalho ( duty cycle ) dos dispositivos que ´e regulamentado em alguns pa ´ıses. Tamb ´em´e
+necess ´ario analisar soluc ¸ ˜oes para os casos em que o ´ultimo pacote do grupo ´e conﬁrmado,
+por´em alguns outros pacotes do mesmo grupo n ˜ao s˜ao, o que pode levar a alterac ¸ ˜oes no
+modelo do algoritmo. Ainda ´e poss ´ıvel a comparac ¸ ˜ao com estrat ´egias consagradas em
+redes de computadores, como Stop and Wait ,Go-Back-N e Retransmiss ˜ao Seletiva. Por
+ﬁm, uma an ´alise de interesse pode ser vista no consumo energ ´etico da soluc ¸ ˜ao e quanti-
+dade de mensagens, para averiguar sua viabilidade em dispositivos ﬁnais com restric ¸ ˜ao
+energ ´etica e tamb ´em caracterizar a eﬁci ˆencia energ ´etica do algoritmo.
+Refer ˆencias
+Bardyn, J., Melly, T., Seller, O., and Sornin, N. (2016). Iot: The era of lpwan is starting
+now. In ESSCIRC , pages 25–30.
+Beltramelli, L., Mahmood, A., Osterberg, P., and Gidlund, M. (2020). LoRa beyond
+ALOHA: An investigation of alternative random access protocols. IEEE Transactions
+on Industrial Informatics , pages 1–1.Centenaro, M., Vangelista, L., Zanella, A., and Zorzi, M. (2016). Long-range communi-
+cations in unlicensed bands: the rising stars in the iot and smart city scenarios. IEEE
+Wireless Communications , 23(5):60–67.
+da Silva, M., de Souza, J., Almeida, T., ´Alvaro Souza, Spanhol, F., and Camargo, E.
+(2020). Avaliac ¸ ˜ao de dispositivos de rastreamento em uma rede lorawan no contexto
+de cidades inteligentes. In Anais do IV Workshop de Computac ¸ ˜ao Urbana , pages 1–14,
+Porto Alegre, RS, Brasil. SBC.
+Ferreira, A., Molano, F., Costa, L., Foubert, B., Amadou, I., and Mitton, N. (2020).
+A study of the lora signal propagation in forest, urban, and suburban environments.
+Annals of Telecommunications .
+Guibene, W., Nowack, J., Chalikias, N., Fitzgibbon, K., Kelly, M., and Prendergast, D.
+(2017). Evaluation of lpwan technologies for smart cities: River monitoring use-case.
+InIEEE WCNCW , pages 1–5.
+Jacobson, V . (1988). Congestion avoidance and control. In Symposium Proceedings on
+Communications Architectures and Protocols , SIGCOMM, pages 314–329, New York,
+NY , USA. ACM.
+Johnston, S. J., Basford, P. J., Bulot, F. M. J., Apetroaie-Cristea, M., Easton, N. H. C.,
+Davenport, C., Foster, G. L., Loxham, M., Morris, A. K. R., and Cox, S. J. (2019).
+City scale particulate matter monitoring using lorawan based air quality iot devices.
+Sensors , 19(1).
+LoRa Alliance (2017). LoRaWAN™ 1.1 speciﬁcation . LoRa Alliance, Beaverton, Oregon,
+Estados Unidos.
+Magrin, D. (2016). Network level performances of a lora system. Master’s thesis, Uni-
+versit `a degli Studi di Padova, P ´adua. Orientador: Lorenzo Vangelista.
+nsnam (2021). ns3: Network Simulator . nsnam.
+Past´orio, A., Rodrigues, L., and de Camargo, E. (2020). Uma revis ˜ao sistem ´atica da
+literatura sobre toler ˆancia a falhas em internet das coisas. In Anais Estendidos do X
+Simp ´osio Brasileiro de Engenharia de Sistemas Computacionais , pages 57–64, Porto
+Alegre, RS, Brasil. SBC.
+Rajkumar, M. N., Abinaya, S., and Kumar, V . V . (2017). Intelligent irrigation system
+— an iot based approach. In 2017 International Conference on Innovations in Green
+Energy and Healthcare Technologies (IGEHT) , pages 1–5.
+Rappaport, T. S. (2009). Comunicac ¸ ˜oes sem ﬁo, Princ ´ıpios e Pr ´aticas . Person Prentice
+Hall, S ˜ao Paulo, SP.
+Rossato, J., Spanhol, F., and Camargo, E. (2020). Implantac ¸ ˜ao e avaliac ¸ ˜ao de uma rede
+sem-ﬁo de longo alcance e baixa pot ˆencia para cidades inteligentes. In Anais do IV
+Workshop de Computac ¸ ˜ao Urbana , pages 192–205, Porto Alegre, RS, Brasil. SBC.
+Semtech Corporation (2015). AN1200.22 LoRa Modulation Basics . Semtech.
+Tzounis, A., Katsoulas, N., Bartzanas, T., and Kittas, C. (2017). Internet of things in
+agriculture, recent advances and future challenges. Biosystems Engineering , 164:31 –
+48.
